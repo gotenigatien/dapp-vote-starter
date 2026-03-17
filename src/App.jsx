@@ -1,8 +1,11 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { BrowserProvider, Contract } from 'ethers'
 import ABI from './abi.json'
 import { CONTRACT_ADDRESS, EXPECTED_CHAIN_ID, EXPECTED_NETWORK_NAME } from './config'
 import './index.css'
+import imgLeonBlum     from '../img/leon_blum.png'
+import imgChirac       from '../img/chiraq.png'
+import imgMitterrand   from '../img/miterrand.png'
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 const C = {
@@ -48,7 +51,7 @@ const S = {
   },
   nav: {
     width: '100%',
-    maxWidth: '900px',
+    maxWidth: '1200px',
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -78,7 +81,7 @@ const S = {
   subtitle: { fontSize: '14px', color: C.textMuted, lineHeight: '1.8', letterSpacing: '0.3px', fontWeight: '300' },
   card: {
     background: C.bgCard, border: `0.5px solid ${C.border}`, borderRadius: '8px',
-    padding: '32px', width: '100%', maxWidth: '900px', marginBottom: '20px',
+    padding: '32px', width: '100%', maxWidth: '1200px', marginBottom: '20px',
     boxShadow: '0px 10px 34px rgba(0,0,0,0.5)',
   },
   cardTitle: {
@@ -97,14 +100,14 @@ const S = {
   },
   addressPill: {
     background: C.mintDim, border: `0.5px solid ${C.mintBorder}`, borderRadius: '6px',
-    padding: '12px 20px', display: 'flex', alignItems: 'center', gap: '12px',
-    width: 'fit-content', margin: '0 auto',
+    padding: '12px 24px', display: 'flex', alignItems: 'center', gap: '12px',
+    width: '100%', maxWidth: '600px', margin: '0 auto',
   },
   dot: {
     width: '8px', height: '8px', borderRadius: '50%', background: C.mint,
     boxShadow: `0 0 6px ${C.mint}`, flexShrink: 0, animation: 'pulse-dot 2s ease-in-out infinite',
   },
-  addressText: { color: C.mint, fontFamily: "'JetBrains Mono', monospace", fontSize: '13px', fontWeight: '600', letterSpacing: '0.5px' },
+  addressText: { color: C.mint, fontFamily: "'JetBrains Mono', monospace", fontSize: '13px', fontWeight: '600', letterSpacing: '0.5px', wordBreak: 'break-all', flex: 1 },
   networkLabel: { color: C.textDim, fontSize: '12px', letterSpacing: '0.3px' },
   grid: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' },
   candidateCard: {
@@ -121,7 +124,18 @@ const S = {
     background: `linear-gradient(90deg, transparent, ${C.gold}, transparent)`,
     opacity: 0, transition: 'opacity 0.2s ease',
   },
-  candidateIcon:       { fontSize: '28px', marginBottom: '14px', display: 'block' },
+  candidateImg: {
+    width: '80px', height: '80px', borderRadius: '50%', objectFit: 'cover',
+    marginBottom: '14px', display: 'block', margin: '0 auto 14px',
+    border: `2px solid rgba(23,235,189,0.2)`,
+    boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
+    filter: 'grayscale(20%)',
+    transition: 'filter 0.2s ease, border-color 0.2s ease',
+  },
+  candidateImgHover: {
+    filter: 'grayscale(0%)',
+    borderColor: 'rgba(239,186,50,0.6)',
+  },
   candidateName:       { fontSize: '13px', fontWeight: '600', color: C.text, marginBottom: '16px', letterSpacing: '0.5px', textTransform: 'uppercase' },
   candidateVotes:      { fontSize: '36px', fontWeight: '800', color: C.gold, marginBottom: '2px', lineHeight: '1', textShadow: `0 0 20px ${C.goldGlow}` },
   candidateVotesLabel: { fontSize: '10px', color: C.textDim, textTransform: 'uppercase', letterSpacing: '1.5px', marginBottom: '10px' },
@@ -182,7 +196,7 @@ const S = {
     fontFamily: "'JetBrains Mono', monospace", letterSpacing: '0.5px', transition: 'all 0.2s ease',
   },
   tableWrapper:      { overflowX: 'auto', marginTop: '16px' },
-  explorerTable:     { width: '100%', borderCollapse: 'collapse', fontSize: '11px', fontFamily: "'JetBrains Mono', monospace", minWidth: '900px' },
+  explorerTable:     { width: '100%', borderCollapse: 'collapse', fontSize: '11px', fontFamily: "'JetBrains Mono', monospace", minWidth: '1100px' },
   explorerTh: {
     textAlign: 'left', padding: '8px 12px', color: C.textDim, fontSize: '10px',
     letterSpacing: '1px', textTransform: 'uppercase', borderBottom: `0.5px solid ${C.border}`, fontWeight: '600',
@@ -245,13 +259,13 @@ const S = {
   footer: {
     marginTop: '60px', color: C.textDim, fontSize: '11px', textAlign: 'center',
     letterSpacing: '0.5px', borderTop: `0.5px solid ${C.border}`, paddingTop: '20px',
-    width: '100%', maxWidth: '900px',
+    width: '100%', maxWidth: '1200px',
   },
 }
 
 // ─── Static data ──────────────────────────────────────────────────────────────
 const CANDIDATE_NAMES = ['Léon Blum', 'Jacques Chirac', 'François Mitterrand']
-const ICONS = ['🌐', '🔒', '🤝']
+const CANDIDATE_IMGS  = [imgLeonBlum, imgChirac, imgMitterrand]
 
 const ACCORDION_ITEMS = [
   {
@@ -276,7 +290,6 @@ function Spinner() {
 
 function TxStatusBanner({ status }) {
   if (!status) return null
-  const short = (h) => `${h.slice(0, 8)}...${h.slice(-6)}`
   const steps = {
     1: { icon: '⏳', label: 'Signature dans MetaMask...' },
     2: { icon: '📡', label: 'Transaction envoyée — hash :' },
@@ -285,11 +298,11 @@ function TxStatusBanner({ status }) {
   }
   const m = steps[status.step]
   return (
-    <div style={S.txBanner}>
+    <div style={{ ...S.txBanner, flexWrap: 'wrap' }}>
       <span>{m.icon}</span>
       <span style={{ color: C.textMuted }}>{m.label}</span>
       {(status.step === 2 || status.step === 3) && status.hash && (
-        <span style={{ fontFamily: 'monospace', color: C.mint, fontSize: '11px' }}>{short(status.hash)}</span>
+        <span style={{ fontFamily: 'monospace', color: C.mint, fontSize: '11px', wordBreak: 'break-all', flex: '1 1 100%' }}>{status.hash}</span>
       )}
       {status.step === 4 && status.blockNumber && (
         <span style={{ color: C.gold }}>#{status.blockNumber}</span>
@@ -314,11 +327,15 @@ function DataRow({ label, value, link, highlight, last }) {
   )
 }
 
-function BlockModal({ data, loading, onClose, onNavigate }) {
+function BlockModal({ data, loading, onClose, onNavigate, latestBlock }) {
+  const [showExtra, setShowExtra] = useState(false)
   if (!data) return null
   const { event, block } = data
   const fmt    = (ts) => ts != null ? new Date(ts * 1000).toLocaleString('fr-FR') : '—'
   const fmtNum = (n)  => n  != null ? Number(n).toLocaleString('fr-FR') : '—'
+  const canPrev = block?.number != null && block.number > 1
+  const canNext = block?.number != null && latestBlock != null && block.number < latestBlock
+  const navDisabled = { opacity: 0.3, cursor: 'not-allowed', pointerEvents: 'none', filter: 'grayscale(1)' }
 
   return (
     <div style={S.modalOverlay} onClick={onClose}>
@@ -326,10 +343,17 @@ function BlockModal({ data, loading, onClose, onNavigate }) {
 
         {/* Header */}
         <div style={S.modalHeader}>
-          <div style={S.modalTitle}>
-            BLOC #{block?.number ?? '...'} — Vue détaillée
+          <div style={S.modalTitle}>BLOC #{block?.number ?? '...'} — Vue détaillée</div>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            {block?.number != null && (
+              <a href={`https://sepolia.etherscan.io/block/${block.number}`}
+                target="_blank" rel="noopener noreferrer"
+                style={{ ...S.modalCloseBtn, color: C.mint, textDecoration: 'none', display: 'inline-block', cursor: 'pointer' }}>
+                🔍 Etherscan
+              </a>
+            )}
+            <button style={S.modalCloseBtn} onClick={onClose}>✕ Fermer</button>
           </div>
-          <button style={S.modalCloseBtn} onClick={onClose}>✕ Fermer</button>
         </div>
 
         {loading ? (
@@ -338,19 +362,41 @@ function BlockModal({ data, loading, onClose, onNavigate }) {
           </div>
         ) : (
           <div style={S.modalBody}>
-            <DataRow label="Transaction Hash"
-              value={event?.hash ?? '—'}
-              link={event?.hash ? `https://sepolia.etherscan.io/tx/${event.hash}` : null} />
-            <DataRow label="Bloc"
-              value={block?.number != null ? `#${block.number}` : '—'}
-              link={block?.number != null ? `https://sepolia.etherscan.io/block/${block.number}` : null} />
-            <DataRow label="parentHash"  value={block?.parentHash ?? '—'} />
-            <DataRow label="Votant"      value={event?.voter ?? '—'} />
-            <DataRow label="Candidat voté" value={event?.candidateName ?? '—'} highlight={C.gold} />
-            <DataRow label="gasUsed"     value={event?.gasUsed != null ? `${fmtNum(event.gasUsed)} unités` : '—'} />
-            <DataRow label="Timestamp"   value={fmt(block?.timestamp)} last />
+            {event ? (
+              <>
+                <DataRow label="Transaction Hash"
+                  value={event?.hash ?? '—'}
+                  link={event?.hash ? `https://sepolia.etherscan.io/tx/${event.hash}` : null} />
+                <DataRow label="Votant"        value={event?.voter ?? '—'} />
+                <DataRow label="Candidat voté" value={event?.candidateName ?? '—'} highlight={C.gold} />
+                <DataRow label="Gas (tx)"      value={event?.gasUsed != null ? `${fmtNum(event.gasUsed)} unités` : '—'} />
+              </>
+            ) : (
+              <div style={{ ...S.modalValue, color: C.textDim, marginBottom: '16px', fontStyle: 'italic' }}>
+                Aucun vote enregistré dans ce bloc.
+              </div>
+            )}
+            <DataRow label="Numéro de bloc" value={block?.number != null ? `#${block.number}` : '—'} />
+            <DataRow label="Timestamp"      value={fmt(block?.timestamp)} />
+            <DataRow label="parentHash"     value={block?.parentHash ?? '—'} />
 
-            {/* Encart pédagogique 3 */}
+            {/* Toggle extra block info */}
+            <button
+              onClick={() => setShowExtra(s => !s)}
+              className="explorer-toggle-btn"
+              style={{ ...S.explorerToggleBtn, marginTop: '12px', marginBottom: showExtra ? '16px' : '0' }}>
+              {showExtra ? '▴ Masquer les détails' : '▾ Plus d\'infos sur ce bloc'}
+            </button>
+
+            {showExtra && (
+              <>
+                <DataRow label="gasLimit (bloc)"  value={block?.gasLimit != null ? `${fmtNum(block.gasLimit)} unités` : '—'} />
+                <DataRow label="gasUsed (bloc)"   value={block?.gasUsedBlock != null ? `${fmtNum(block.gasUsedBlock)} unités` : '—'} />
+                <DataRow label="Validateur (miner)" value={block?.miner ?? '—'} last />
+              </>
+            )}
+
+            {/* Encart pédagogique */}
             <div style={{ ...S.pedagogy, marginTop: '24px' }}>
               🔐 Le parentHash est le hash du bloc précédent. C'est ce lien cryptographique qui rend la blockchain immuable : modifier ce bloc changerait son hash, invalidant le parentHash du bloc suivant, cassant toute la chaîne jusqu'au bout.
             </div>
@@ -359,8 +405,16 @@ function BlockModal({ data, loading, onClose, onNavigate }) {
 
         {/* Navigation */}
         <div style={S.modalNav}>
-          <button style={S.modalNavBtn} onClick={() => onNavigate(-1)}>← Bloc précédent</button>
-          <button style={S.modalNavBtn} onClick={() => onNavigate(+1)}>Bloc suivant →</button>
+          <button
+            style={{ ...S.modalNavBtn, ...(!canPrev ? navDisabled : {}) }}
+            onClick={() => canPrev && onNavigate(-1)}
+            disabled={!canPrev}
+          >← Bloc précédent</button>
+          <button
+            style={{ ...S.modalNavBtn, ...(!canNext ? navDisabled : {}) }}
+            onClick={() => canNext && onNavigate(+1)}
+            disabled={!canNext}
+          >Bloc suivant →</button>
         </div>
       </div>
     </div>
@@ -386,9 +440,8 @@ function App() {
   const [openAccordions, setOpenAccordions]   = useState({})
   const [modalData, setModalData]             = useState(null)
   const [modalLoading, setModalLoading]       = useState(false)
-  const [selectedTx, setSelectedTx]           = useState(null)
-  const [blockDetails, setBlockDetails]       = useState(null)
-  const [loadingBlock, setLoadingBlock]       = useState(false)
+  const [latestBlockNumber, setLatestBlockNumber] = useState(null)
+  const connectRef = useRef(null)
 
   // ── Chargement initial sans MetaMask ─────────────────────────────────────────
   useEffect(() => {
@@ -446,12 +499,16 @@ function App() {
       const last20 = raw.slice(-20).reverse()
       const enriched = await Promise.all(last20.map(async (e) => {
         let timestamp = null, parentHash = null, gasUsed = null
+        let gasLimit = null, miner = null, gasUsedBlock = null
         const idx = Number(e.args.candidateIndex)
         const candidateName = CANDIDATE_NAMES[idx] ?? `Candidat #${idx}`
         try {
           const block = await p.getBlock(e.blockNumber)
-          timestamp   = block?.timestamp   ?? null
-          parentHash  = block?.parentHash  ?? null
+          timestamp    = block?.timestamp  ?? null
+          parentHash   = block?.parentHash ?? null
+          gasLimit     = block?.gasLimit   != null ? Number(block.gasLimit) : null
+          miner        = block?.miner      ?? null
+          gasUsedBlock = block?.gasUsed    != null ? Number(block.gasUsed)  : null
         } catch { /* silent */ }
         try {
           const receipt = await p.getTransactionReceipt(e.transactionHash)
@@ -466,6 +523,9 @@ function App() {
           timestamp,
           parentHash,
           gasUsed,
+          gasLimit,
+          miner,
+          gasUsedBlock,
         }
       }))
       setExplorerEvents(enriched)
@@ -547,38 +607,44 @@ function App() {
     return () => clearInterval(timer)
   }, [cooldownSeconds])
 
-  // ── Tx detail modal ───────────────────────────────────────────────────────────
-  const openTxModal = async (event) => {
-    setSelectedTx(event)
-    setLoadingBlock(true)
-    try {
-      const block = await provider.getBlock(event.blockNumber)
-      setBlockDetails(block)
-    } catch (err) {
-      console.error(err)
-    } finally {
-      setLoadingBlock(false)
-    }
-  }
-
   // ── Modal helpers ─────────────────────────────────────────────────────────────
   const openModal = (event) => {
     setModalData({
       event,
-      block: { number: event.blockNumber, parentHash: event.parentHash, timestamp: event.timestamp },
+      block: {
+        number: event.blockNumber,
+        parentHash: event.parentHash,
+        timestamp: event.timestamp,
+        gasLimit: event.gasLimit,
+        miner: event.miner,
+        gasUsedBlock: event.gasUsedBlock,
+      },
     })
+    if (provider && latestBlockNumber == null) {
+      provider.getBlockNumber().then(n => setLatestBlockNumber(n)).catch(() => {})
+    }
   }
 
   const navigateModal = async (direction) => {
-    if (!modalData?.block?.number == null) return
+    if (modalData?.block?.number == null) return
     const targetNum = modalData.block.number + direction
     setModalLoading(true)
     try {
       const block = await provider.getBlock(targetNum)
       const matchingEvent = explorerEvents.find(e => e.blockNumber === targetNum) || null
+      if (!latestBlockNumber) {
+        provider.getBlockNumber().then(n => setLatestBlockNumber(n)).catch(() => {})
+      }
       setModalData({
         event: matchingEvent,
-        block: { number: block.number, parentHash: block.parentHash, timestamp: block.timestamp },
+        block: {
+          number: block.number,
+          parentHash: block.parentHash,
+          timestamp: block.timestamp,
+          gasLimit: block.gasLimit != null ? Number(block.gasLimit) : null,
+          miner: block.miner ?? null,
+          gasUsedBlock: block.gasUsed != null ? Number(block.gasUsed) : null,
+        },
       })
     } catch { /* silent */ }
     finally { setModalLoading(false) }
@@ -610,7 +676,7 @@ function App() {
       </div>
 
       {/* ── Wallet ── */}
-      <div style={S.card}>
+      <div style={S.card} ref={connectRef}>
         <div style={S.cardTitle}><span style={S.cardTitleAccent} />Wallet</div>
         {!account ? (
           <button style={S.connectBtn} onClick={connectWallet}>
@@ -619,7 +685,7 @@ function App() {
         ) : (
           <div style={S.addressPill}>
             <div style={S.dot} />
-            <span style={S.addressText}>{account.slice(0, 6)}...{account.slice(-4)}</span>
+            <span style={S.addressText}>{account}</span>
             <span style={S.networkLabel}>· {EXPECTED_NETWORK_NAME}</span>
           </div>
         )}
@@ -696,7 +762,11 @@ function App() {
                   onMouseLeave={() => setHoveredId(null)}
                 >
                   <div style={{ ...S.candidateCardTop, opacity: hovered ? 1 : 0 }} />
-                  <span style={S.candidateIcon}>{ICONS[c.id] || '◈'}</span>
+                  <img
+                    src={CANDIDATE_IMGS[c.id]}
+                    alt={c.name}
+                    style={{ ...S.candidateImg, ...(hovered ? S.candidateImgHover : {}) }}
+                  />
                   <div style={S.candidateName}>{c.name}</div>
                   <div style={S.candidateVotes}>{c.votes}</div>
                   <div style={S.candidateVotesLabel}>votes</div>
@@ -712,7 +782,10 @@ function App() {
                   <div style={S.progressPct}>{pct}%</div>
 
                   {!account ? (
-                    <div style={S.connectToVote}>🦊 Connectez-vous<br />pour voter</div>
+                    <button
+                      style={{ ...S.connectToVote, background: 'transparent', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline', textDecorationColor: C.textDim }}
+                      onClick={() => connectRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
+                    >🦊 Connectez-vous<br />pour voter</button>
                   ) : cooldownSeconds === 0 ? (
                     <button
                       className="vote-btn"
@@ -841,11 +914,8 @@ function App() {
                       style={{ cursor: 'pointer' }}
                     >
                       <td style={S.explorerTd}>
-                        <span
-                          onClick={ev => { ev.stopPropagation(); openTxModal(e) }}
-                          style={{ color: '#14b8a6', fontFamily: 'monospace', fontSize: '13px', cursor: 'pointer', textDecoration: 'underline' }}
-                        >
-                          {e.hash}
+                        <span style={{ color: C.mint, fontFamily: 'monospace', fontSize: '11px', cursor: 'pointer' }}>
+                          {e.hash?.slice(0, 10)}...{e.hash?.slice(-8)}
                         </span>
                       </td>
                       <td style={S.explorerTd}>
@@ -877,106 +947,13 @@ function App() {
         <span style={{ color: C.mint }}>{CONTRACT_ADDRESS}</span>
       </footer>
 
-      {/* ── Modale détail transaction ── */}
-      {selectedTx && (
-        <div style={{
-          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-          background: 'rgba(0,0,0,0.85)', zIndex: 1000,
-          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px',
-        }}>
-          <div style={{
-            background: '#0a1a1c', border: '1px solid rgba(20,184,166,0.3)',
-            borderRadius: '16px', padding: '32px', width: '100%',
-            maxWidth: '700px', maxHeight: '85vh', overflowY: 'auto', position: 'relative',
-          }}>
-            <button
-              onClick={() => { setSelectedTx(null); setBlockDetails(null) }}
-              style={{
-                position: 'absolute', top: '16px', right: '16px',
-                background: 'transparent', border: '1px solid rgba(20,184,166,0.3)',
-                color: '#14b8a6', borderRadius: '8px', padding: '6px 12px',
-                cursor: 'pointer', fontSize: '14px',
-              }}
-            >✕ Fermer</button>
-
-            <div style={{ color: '#4b6b6e', fontSize: '11px', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '8px' }}>
-              Transaction on-chain
-            </div>
-            <div style={{ color: '#f0fdfc', fontSize: '20px', fontWeight: '800', marginBottom: '24px' }}>
-              Bloc #{selectedTx.blockNumber}
-            </div>
-
-            {[
-              { label: 'Transaction Hash', value: selectedTx.hash },
-              { label: 'Votant',           value: selectedTx.voter },
-              { label: 'Candidat voté',    value: selectedTx.candidateName },
-              { label: 'Numéro de bloc',   value: `#${selectedTx.blockNumber}` },
-              { label: 'Heure',            value: selectedTx.timestamp ? new Date(selectedTx.timestamp * 1000).toLocaleString('fr-FR') : '—' },
-            ].map(({ label, value }) => (
-              <div key={label} style={{ marginBottom: '16px', paddingBottom: '16px', borderBottom: '1px solid rgba(20,184,166,0.08)' }}>
-                <div style={{ color: '#4b6b6e', fontSize: '11px', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '6px' }}>{label}</div>
-                <div style={{ color: '#f0fdfc', fontFamily: 'monospace', fontSize: '14px', wordBreak: 'break-all' }}>{value}</div>
-              </div>
-            ))}
-
-            {loadingBlock && (
-              <div style={{ color: '#4b6b6e', textAlign: 'center', padding: '20px' }}>
-                Chargement des données du bloc...
-              </div>
-            )}
-
-            {blockDetails && (
-              <>
-                {[
-                  { label: 'parentHash', value: blockDetails.parentHash },
-                  { label: 'gasUsed',    value: `${blockDetails.gasUsed?.toString()} unités` },
-                  { label: 'gasLimit',   value: `${blockDetails.gasLimit?.toString()} unités` },
-                  { label: 'Validateur', value: blockDetails.miner },
-                ].map(({ label, value }) => (
-                  <div key={label} style={{ marginBottom: '16px', paddingBottom: '16px', borderBottom: '1px solid rgba(20,184,166,0.08)' }}>
-                    <div style={{ color: '#4b6b6e', fontSize: '11px', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '6px' }}>{label}</div>
-                    <div style={{ color: '#f0fdfc', fontFamily: 'monospace', fontSize: '13px', wordBreak: 'break-all' }}>{value}</div>
-                  </div>
-                ))}
-
-                <div style={{ background: 'rgba(20,184,166,0.04)', borderLeft: '3px solid rgba(20,184,166,0.4)', borderRadius: '4px', padding: '12px 16px', marginTop: '8px', marginBottom: '24px' }}>
-                  <div style={{ color: '#5eead4', fontSize: '12px', fontStyle: 'italic', lineHeight: '1.6' }}>
-                    🔐 Le <strong>parentHash</strong> est le hash cryptographique du bloc précédent. C'est ce lien qui rend la blockchain immuable : modifier ce bloc changerait son hash, invalidant le parentHash du bloc suivant, cassant toute la chaîne (section 2.3 du cours).
-                    <br /><br />
-                    ⛽ <strong>gasUsed</strong> représente le coût computationnel de l'exécution de <code>vote()</code> sur l'EVM. Chaque opération Solidity a un prix en gas (section 3.3 du cours).
-                  </div>
-                </div>
-
-                <div style={{ display: 'flex', gap: '12px', marginBottom: '20px' }}>
-                  <button
-                    onClick={async () => { const b = await provider.getBlock(blockDetails.number - 1); setBlockDetails(b) }}
-                    style={{ flex: 1, background: 'rgba(20,184,166,0.08)', border: '1px solid rgba(20,184,166,0.25)', color: '#14b8a6', borderRadius: '8px', padding: '10px', cursor: 'pointer', fontSize: '14px', fontWeight: '600' }}
-                  >← Bloc précédent #{blockDetails.number - 1}</button>
-                  <button
-                    onClick={async () => { const b = await provider.getBlock(blockDetails.number + 1); setBlockDetails(b) }}
-                    style={{ flex: 1, background: 'rgba(20,184,166,0.08)', border: '1px solid rgba(20,184,166,0.25)', color: '#14b8a6', borderRadius: '8px', padding: '10px', cursor: 'pointer', fontSize: '14px', fontWeight: '600' }}
-                  >Bloc suivant #{blockDetails.number + 1} →</button>
-                </div>
-
-                <div style={{ textAlign: 'center' }}>
-                  <a
-                    href={`https://sepolia.etherscan.io/tx/${selectedTx.hash}`}
-                    target="_blank" rel="noopener noreferrer"
-                    style={{ color: '#14b8a6', fontSize: '13px', textDecoration: 'none', borderBottom: '1px solid rgba(20,184,166,0.3)', paddingBottom: '2px' }}
-                  >🔍 Vérifier cette transaction sur Etherscan →</a>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-      )}
-
       {/* ── Modal bloc ── */}
       <BlockModal
         data={modalData}
         loading={modalLoading}
         onClose={() => { setModalData(null); setModalLoading(false) }}
         onNavigate={navigateModal}
+        latestBlock={latestBlockNumber}
       />
 
     </div>
