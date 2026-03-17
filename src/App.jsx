@@ -19,7 +19,7 @@ const ACCORDION_ITEMS = [
   },
   {
     title: '② Signer une transaction',
-    content: "Voter = envoyer une transaction à un smart contract. MetaMask calcule le hash de cette transaction, le signe avec votre clé privée (algorithme ECDSA), et diffuse la transaction signée sur le réseau Ethereum. Le réseau vérifie la signature — sans jamais voir votre clé privée — et confirme que c'est bien vous qui avez voté.",
+    content: "Voter = envoyer une transaction à un smart contract. MetaMask calcule le hash de cette transaction, le signe avec votre clé privée (algorithme ECDSA), et diffuse la transaction signée sur le réseau Ethereum. Le réseau vérifie la signature — sans jamais voir votre clé privée — et confirme que c'est bien vous qui avez voté. Le contrat vérifie ensuite que votre cooldown est écoulé avant d'enregistrer le vote.",
   },
   {
     title: '③ Confirmation on-chain',
@@ -441,8 +441,8 @@ function App() {
         <p className="contract-desc">
           Ce contrat est déployé de façon permanente sur Ethereum Sepolia. Son code ne peut plus être modifié —
           c'est l'immuabilité de la blockchain. Chaque vote appelle la fonction{' '}
-          <span className="accent">vote(candidateIndex)</span> qui vérifie que vous n'avez pas déjà voté via{' '}
-          <span className="accent">require(!hasVoted[msg.sender])</span>, incrémente le compteur du candidat,
+          <span className="accent">vote(candidateIndex)</span> qui vérifie que le cooldown est écoulé via{' '}
+          <span className="accent">lastVoteTime[msg.sender]</span>, incrémente le compteur du candidat,
           et émet un event <span className="accent-gold">Voted</span> enregistré de façon permanente dans les logs
           de la transaction.
         </p>
@@ -582,7 +582,7 @@ function App() {
         <div style={{ maxHeight: explorerOpen ? '800px' : '0px', overflow: 'hidden', transition: 'max-height 0.4s ease' }}>
           <div className="pedagogy" style={{ marginTop: '20px', marginBottom: '4px' }}>
             📚 Ce que vous voyez ici est l'historique immuable des transactions enregistrées on-chain.
-            Chaque ligne est un bloc Ethereum contenant votre vote. Le parentHash relie chaque bloc au précédent —
+            Chaque ligne est une transaction de vote incluse dans un bloc Ethereum. Le parentHash relie chaque bloc au précédent —
             modifier un bloc invaliderait toute la chaîne. C'est le mécanisme d'immuabilité vu en cours.
           </div>
 
